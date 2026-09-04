@@ -1,3 +1,5 @@
 py_clob_client_v2==1.1.0
 requests==2.34.2
 PyYAML==6.0.3
+pycryptodome==3.23.0
+

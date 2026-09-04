@@ -183,6 +183,34 @@ prompts (useful for scripting).
 You can even dry-run with no `--url`/`--token-id` at all — a placeholder token ID is used
 just to exercise the argument validation.
 
+## 7. Using a proxy or deposit wallet
+
+If you log into Polymarket with email/Magic-link, or trade through a browser wallet
+connected via Polymarket's UI, your funds live in a separate wallet from your raw signer
+address. Tell the script which kind of wallet you have with `--signature-type`:
+
+| Wallet | `--signature-type` |
+| --- | --- |
+| Plain wallet (EOA) | `0` (default) |
+| Email/Magic-link login | `1` |
+| Browser wallet via Polymarket's Gnosis Safe proxy | `2` |
+| Polymarket deposit wallet | `3` |
+
+For anything other than `0`, add the address that actually holds your funds (find it in
+Polymarket's account settings) to `config.yaml`:
+
+```yaml
+polymarket:
+  funder: "0xYourPolymarketDepositWalletAddress"
+```
+
+(`POLYMARKET_FUNDER` also works as an env var override.) This isn't a `--flag` since it
+rarely changes between runs — set it once in `config.yaml` and just pass `--signature-type`:
+
+```bash
+python3 buy_polymarket.py --url "..." --signature-type 3 --mode limit --money 50
+```
+
 ## Troubleshooting
 
 | Error | Meaning |
@@ -192,6 +220,7 @@ just to exercise the argument validation.
 | `A token ID is required` | Pass `--url`, `--token-id`, set `POLYMARKET_TOKEN_ID`, or add `--dry-run`. |
 | `No option selected.` | You skipped or quit every option in the interactive `--url` walkthrough. |
 | `Cancelled.` (after the summary) | You answered anything other than `y` at the confirmation prompt — no order was placed. |
+| `maker address not allowed, please use the deposit wallet flow` | Try `--signature-type 3` (see [section 7](#7-using-a-proxy-or-deposit-wallet)) with `polymarket.funder` set in `config.yaml`. |
 | 403 / geo-block errors | Run `python3 test_connection.py` — the "without key" test flags if your IP is region-blocked. |
 | Insufficient balance/allowance errors | Fund your wallet with USDC and ensure Polymarket allowances are set (this normally happens automatically the first time you trade via the official UI). |
 

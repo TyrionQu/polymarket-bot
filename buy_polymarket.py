@@ -1,30 +1,57 @@
 import argparse
+import getpass
 import json
 import os
-import re
 import sys
 
+import yaml
 from py_clob_client_v2 import ClobClient, MarketOrderArgs, OrderArgs, OrderType
 from py_clob_client_v2.order_builder.constants import BUY
 
+from key_crypto import decrypt_private_key, normalize_private_key, verify_private_key
 from list_bets import resolve_markets_by_slug
 
 # --- Configurations ---
 HOST = "https://clob.polymarket.com"
 CHAIN_ID = 137  # Polygon Mainnet
 DRY_RUN_PLACEHOLDER_TOKEN_ID = "0" * 64
+CONFIG_PATH = "config.yaml"
+
+
+def load_polymarket_config(config_path: str = CONFIG_PATH) -> dict:
+    if not os.path.exists(config_path):
+        return {}
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+    return config.get("polymarket") or {}
+
+
+def load_encrypted_private_key(config_path: str = CONFIG_PATH):
+    return (load_polymarket_config(config_path).get("encrypted_private_key") or "").strip() or None
 
 
 def load_private_key() -> str:
+    encrypted = load_encrypted_private_key()
+    if encrypted:
+        password = getpass.getpass("Enter password to decrypt your private key: ")
+        try:
+            key = decrypt_private_key(encrypted, password)
+        except ValueError as e:
+            sys.exit(str(e))
+        if not verify_private_key(key):
+            sys.exit("Decrypted value is not a valid private key.")
+        return normalize_private_key(key)
+
+    # Fall back to the environment variable (kept for scripting/automation).
     key = os.environ.get("POLYMARKET_PRIVATE_KEY", "").strip()
     if not key:
-        sys.exit("POLYMARKET_PRIVATE_KEY is not set.")
-    if not key.startswith("0x"):
-        key = "0x" + key
-    # A Polygon/Ethereum private key is 32 bytes = 64 hex characters.
-    if not re.fullmatch(r"0x[0-9a-fA-F]{64}", key):
+        sys.exit(
+            "No key found: add polymarket.encrypted_private_key to config.yaml (see encrypt_key.py)"
+            " or set POLYMARKET_PRIVATE_KEY."
+        )
+    if not verify_private_key(key):
         sys.exit("POLYMARKET_PRIVATE_KEY must be a 64-character hex string (optionally 0x-prefixed).")
-    return key
+    return normalize_private_key(key)
 
 
 def market_outcomes(market: dict) -> dict:
@@ -63,27 +90,56 @@ def prompt_float(prompt: str, min_value: float = None, max_value: float = None) 
         return value
 
 
-def select_token_interactively(markets: list):
-    """Walks the user through each market, asking buy yes/no/skip. Returns (label, token_id, current_price)."""
+def show_order_book(token_id: str):
+    # Local import: avoids a circular import, since order_book.py itself imports from this module.
+    from order_book import fetch_order_book, print_order_book
+
+    try:
+        print_order_book(fetch_order_book(token_id), depth=5)
+    except Exception as e:
+        print(f"  (Could not load order book: {e})")
+
+
+def select_token_interactively(markets: list, args):
+    """Walks the user through each market, asking buy yes/no/skip. Returns (label, token_id, current_price).
+
+    After picking yes/no (and, in limit mode, seeing the order book), the user can still
+    back out with [r]eturn to re-pick for the same market instead of committing to a price/amount.
+    """
     for i, market in enumerate(markets, 1):
         outcomes = market_outcomes(market)
         yes, no = outcomes.get("yes"), outcomes.get("no")
-        print(f"\n[{i}/{len(markets)}] {market.get('question') or market.get('slug')}")
-        if yes:
-            print(f"  yes: price={yes[0]}")
-        if no:
-            print(f"  no : price={no[0]}")
 
-        choice = prompt_choice("  Buy [y]es / [n]o / [s]kip / [q]uit? ", {"y", "n", "s", "q"})
-        if choice == "q":
-            sys.exit("Cancelled.")
-        if choice == "s":
-            continue
-        if choice == "y" and yes:
-            return "YES", yes[1], yes[0]
-        if choice == "n" and no:
-            return "NO", no[1], no[0]
-        print("  That outcome isn't available for this market; skipping.")
+        while True:
+            print(f"\n[{i}/{len(markets)}] {market.get('question') or market.get('slug')}")
+            if yes:
+                print(f"  yes: price={yes[0]}")
+            if no:
+                print(f"  no : price={no[0]}")
+
+            choice = prompt_choice("  Buy [y]es / [n]o / [s]kip / [q]uit? ", {"y", "n", "s", "q"})
+            if choice == "q":
+                sys.exit("Cancelled.")
+            if choice == "s":
+                break
+            if choice == "y" and yes:
+                label, token_id, current_price = "YES", yes[1], yes[0]
+            elif choice == "n" and no:
+                label, token_id, current_price = "NO", no[1], no[0]
+            else:
+                print("  That outcome isn't available for this market; skipping.")
+                continue
+
+            if args.mode == "limit":
+                show_order_book(token_id)
+                verb = "price"
+            else:
+                verb = "amount"
+
+            decision = prompt_choice(f"  [r]eturn to outcome selection or [e]nter {verb}? ", {"r", "e"})
+            if decision == "r":
+                continue
+            return label, token_id, current_price
 
     return None, None, None
 
@@ -103,13 +159,9 @@ def resolve_order_amounts(args, token_id: str, current_price: float = None):
     # Limit mode: the user needs a price before a money budget can be turned into shares.
     price = args.price
     if price is None:
-        # Local import: avoids a circular import, since order_book.py itself imports from this module.
-        from order_book import fetch_order_book, print_order_book
-
-        try:
-            print_order_book(fetch_order_book(token_id), depth=5)
-        except Exception as e:
-            print(f"  (Could not load order book: {e})")
+        if not args.url:
+            # --url already showed the order book (and a return/enter gate) during selection.
+            show_order_book(token_id)
 
         hint = f" (current price: {current_price})" if current_price is not None else ""
         price = prompt_float(f"Enter your limit price{hint}, between 0 and 1: $", min_value=0.0001, max_value=0.9999)
@@ -155,14 +207,33 @@ def parse_args():
         action="store_true",
         help="Print what would be submitted without needing a private key and without posting an order",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--signature-type",
+        type=int,
+        default=int(os.environ.get("POLYMARKET_SIGNATURE_TYPE", "0")),
+        help="Wallet type: 0=EOA/plain wallet (default), 1=email/Magic proxy wallet, 2=browser wallet via Polymarket's"
+        " Gnosis Safe proxy, 3=Polymarket deposit wallet. If you see 'maker address not allowed, please use the"
+        " deposit wallet flow', use --signature-type 3. (or set POLYMARKET_SIGNATURE_TYPE)",
+    )
+    args = parser.parse_args()
+
+    # Deposit/proxy wallet address: not a CLI flag, since it rarely changes between runs.
+    args.funder = (
+        os.environ.get("POLYMARKET_FUNDER", "").strip() or (load_polymarket_config().get("funder") or "").strip()
+    ) or None
+    if args.signature_type != 0 and not args.funder:
+        sys.exit(
+            "--signature-type other than 0 requires a funder address: set POLYMARKET_FUNDER or"
+            " polymarket.funder in config.yaml (your Polymarket deposit/proxy wallet address)."
+        )
+    return args
 
 
 def resolve_token(args) -> tuple:
     """Returns (label_or_None, token_id, current_price_or_None)."""
     if args.url:
         markets = resolve_markets_by_slug(args.url)
-        label, token_id, current_price = select_token_interactively(markets)
+        label, token_id, current_price = select_token_interactively(markets, args)
         if not token_id:
             sys.exit("No option selected.")
         return label, token_id, current_price
@@ -204,7 +275,13 @@ def main():
         sys.exit("Cancelled.")
 
     private_key = load_private_key()
-    client = ClobClient(host=HOST, key=private_key, chain_id=CHAIN_ID)
+    client = ClobClient(
+        host=HOST,
+        key=private_key,
+        chain_id=CHAIN_ID,
+        signature_type=args.signature_type,
+        funder=args.funder,
+    )
     client.set_api_creds(client.create_or_derive_api_key())
 
     if args.mode == "limit":

@@ -1,0 +1,23 @@
+# Copy this file to config.yaml and fill in your own values.
+# config.yaml is git-ignored -- never commit your real token or encrypted key.
+
+github:
+  # Personal access token used by setup_github_repo.py (repo scope is enough).
+  token: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+polymarket:
+  # Generate this with: python3 encrypt_key.py
+  # It is your Polygon wallet private key, encrypted with a password you choose.
+  # buy_polymarket.py decrypts it at runtime by prompting for that password --
+  # the plaintext key is never written to disk and only lives in memory while
+  # the script runs.
+  encrypted_private_key: ""
+
+  # Only needed if you use --signature-type 1 (email/Magic login), 2 (browser
+  # wallet via Polymarket's Gnosis Safe proxy), or 3 (Polymarket deposit wallet --
+  # try this one if you see "maker address not allowed, please use the deposit
+  # wallet flow"). This is your public Polymarket deposit/proxy wallet address
+  # (find it in Polymarket's account settings) -- not a secret, but not needed
+  # at all for --signature-type 0 (plain EOA wallet).
+  funder: "0xYourPolymarketDepositWalletAddress"
+
