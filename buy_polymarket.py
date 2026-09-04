@@ -89,7 +89,7 @@ def select_token_interactively(markets: list):
     return None, None, None
 
 
-def resolve_order_amounts(args, current_price: float = None):
+def resolve_order_amounts(args, token_id: str, current_price: float = None):
     """Returns (price, size, amount) for the chosen mode, prompting for a total money
     budget when it isn't fully specified on the command line.
     """
@@ -104,6 +104,14 @@ def resolve_order_amounts(args, current_price: float = None):
     # Limit mode: the user needs a price before a money budget can be turned into shares.
     price = args.price
     if price is None:
+        # Local import: avoids a circular import, since order_book.py itself imports from this module.
+        from order_book import fetch_order_book, print_order_book
+
+        try:
+            print_order_book(fetch_order_book(token_id), depth=5)
+        except Exception as e:
+            print(f"  (Could not load order book: {e})")
+
         hint = f" (current price: {current_price})" if current_price is not None else ""
         price = prompt_float(f"Enter your limit price{hint}, between 0 and 1: $", min_value=0.0001, max_value=0.9999)
 
@@ -186,7 +194,7 @@ def print_order_summary(label, token_id, mode, price, size, amount, header="Orde
 def main():
     args = parse_args()
     label, token_id, current_price = resolve_token(args)
-    price, size, amount = resolve_order_amounts(args, current_price)
+    price, size, amount = resolve_order_amounts(args, token_id, current_price)
 
     if args.dry_run:
         print_order_summary(label, token_id, args.mode, price, size, amount, header="[DRY RUN] Would submit")
