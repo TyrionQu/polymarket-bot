@@ -1,6 +1,6 @@
 # How to Buy a Polymarket Bet with `buy_polymarket.py`
 
-This guide walks through placing a buy order on Polymarket using [buy_polymarket.py](buy_polymarket.py),
+This guide walks through placing a buy order on Polymarket using [buy_polymarket.py](../buy_polymarket.py),
 either at a **limit price** (you set the price) or at **market price** (fills immediately at
 the best available price).
 
@@ -58,7 +58,7 @@ A bare slug (the last path segment of the URL) also works instead of the full li
 
 ## 4. Prefer to browse first, or already have a token ID?
 
-Use [list_bets.py](list_bets.py) to browse markets without buying:
+Use [list_bets.py](../list_bets.py) to browse markets without buying:
 
 ```bash
 python3 list_bets.py --limit 10
