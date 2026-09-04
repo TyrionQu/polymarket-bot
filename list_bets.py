@@ -1,5 +1,7 @@
 import argparse
 import json
+import sys
+from urllib.parse import urlparse
 
 import requests
 
@@ -43,8 +45,34 @@ def format_market(market: dict) -> str:
     return "\n".join(lines)
 
 
+def slug_from_url(url_or_slug: str) -> str:
+    """Extracts the trailing slug from a polymarket.com/event/<slug> link."""
+    path = urlparse(url_or_slug).path if "://" in url_or_slug else url_or_slug
+    return path.rstrip("/").rsplit("/", 1)[-1]
+
+
+def resolve_markets_by_slug(url_or_slug: str) -> list:
+    slug = slug_from_url(url_or_slug)
+
+    # Single-market (binary Yes/No) bets: the page slug is the market slug directly.
+    resp = requests.get(f"{GAMMA_HOST}/markets/slug/{slug}", timeout=15)
+    if resp.status_code == 200:
+        return [resp.json()]
+
+    # Multi-market events: the page slug is the event slug; it groups several markets.
+    resp = requests.get(f"{GAMMA_HOST}/events/slug/{slug}", timeout=15)
+    if resp.status_code == 200:
+        return resp.json().get("markets", [])
+
+    sys.exit(f"No market or event found for slug {slug!r} (from {url_or_slug!r}).")
+
+
 def main():
     parser = argparse.ArgumentParser(description="List known Polymarket bets with detailed info.")
+    parser.add_argument(
+        "--url",
+        help="A Polymarket bet page link (or bare slug); prints that bet's outcome token IDs and exits",
+    )
     parser.add_argument("--limit", type=int, default=10, help="Number of markets to list")
     parser.add_argument(
         "--order",
@@ -54,6 +82,14 @@ def main():
     parser.add_argument("--include-closed", action="store_true", help="Include closed markets")
     parser.add_argument("--all", action="store_true", help="Include inactive markets too")
     args = parser.parse_args()
+
+    if args.url:
+        markets = resolve_markets_by_slug(args.url)
+        print(f"Found {len(markets)} market(s) for {args.url!r}\n")
+        for market in markets:
+            print(format_market(market))
+            print("-" * 80)
+        return
 
     markets = fetch_markets(
         limit=args.limit,
