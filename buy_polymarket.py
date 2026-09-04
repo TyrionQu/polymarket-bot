@@ -4,9 +4,8 @@ import os
 import re
 import sys
 
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import MarketOrderArgs, OrderArgs, OrderType
-from py_clob_client.order_builder.constants import BUY
+from py_clob_client_v2 import ClobClient, MarketOrderArgs, OrderArgs, OrderType
+from py_clob_client_v2.order_builder.constants import BUY
 
 from list_bets import resolve_markets_by_slug
 
@@ -206,7 +205,7 @@ def main():
 
     private_key = load_private_key()
     client = ClobClient(host=HOST, key=private_key, chain_id=CHAIN_ID)
-    client.set_api_creds(client.create_or_derive_api_creds())
+    client.set_api_creds(client.create_or_derive_api_key())
 
     if args.mode == "limit":
         order_args = OrderArgs(price=price, size=size, side=BUY, token_id=token_id)

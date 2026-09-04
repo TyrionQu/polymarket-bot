@@ -3,8 +3,7 @@ import re
 import sys
 
 import requests
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import AssetType, BalanceAllowanceParams
+from py_clob_client_v2 import AssetType, BalanceAllowanceParams, ClobClient
 
 HOST = "https://clob.polymarket.com"
 CHAIN_ID = 137  # Polygon Mainnet
@@ -63,7 +62,7 @@ def test_with_key():
 
     address = check("Wallet address", client.get_address)
 
-    creds = check("Derive/create API creds", client.create_or_derive_api_creds)
+    creds = check("Derive/create API creds", client.create_or_derive_api_key)
     if not creds:
         return
     client.set_api_creds(creds)
