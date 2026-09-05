@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timezone
 
 import requests
-from py_clob_client_v2 import ClobClient, OrderArgs, OrderPayload, OrderType
+from py_clob_client_v2 import AssetType, BalanceAllowanceParams, ClobClient, OrderArgs, OrderPayload, OrderType
 from py_clob_client_v2.order_builder.constants import SELL
 
 from buy_polymarket import (
@@ -58,6 +58,17 @@ def format_order(order: dict) -> str:
         f"Status   : {order.get('status')} ({order.get('order_type')})",
         f"Created  : {created_str}",
     ])
+
+
+def fetch_wallet_balance(client: ClobClient):
+    """Returns the wallet's USDC (collateral) balance in dollars, or None if it couldn't be fetched."""
+    try:
+        result = client.get_balance_allowance(BalanceAllowanceParams(asset_type=AssetType.COLLATERAL))
+        # Collateral balance is returned in 6-decimal base units (1 USDC = 1_000_000).
+        return int(result["balance"]) / 1_000_000
+    except Exception as e:
+        print(f"  (Could not fetch wallet balance: {e})")
+        return None
 
 
 def fetch_held_positions(address: str) -> list:
@@ -201,6 +212,11 @@ def main():
 
     orders = client.get_open_orders()
     holder_address = args.funder if args.signature_type != 0 else client.get_address()
+
+    balance = fetch_wallet_balance(client)
+    if balance is not None:
+        print(f"Wallet balance: ${balance:,.2f} USDC (address {holder_address})\n")
+
     positions = fetch_held_positions(holder_address)
 
     items = build_items(orders, positions)
