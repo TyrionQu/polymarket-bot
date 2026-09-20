@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 
@@ -20,11 +21,21 @@ fake_positions = [
 ]
 items = m.build_items([], fake_positions)
 
+order_book_calls = []
+
 
 def fake_show_order_book(token_id):
+    order_book_calls.append(token_id)
     print(f"(fake order book for {token_id})")
 
 
 m.show_order_book = fake_show_order_book
+
+# Drive: select bet 0, confirm sell, enter 0 (refresh order book), then a real
+# price, shares, and confirm. The lone 0 exercises the refresh-and-reprompt path.
+sys.stdin = io.StringIO("0\ny\n0\n0.5\n25\ny\n")
 m.process_selection(FakeClient(), items, dry_run=True)
+
+# Initial book + one refresh triggered by entering 0 at the price prompt.
+assert len(order_book_calls) == 2, order_book_calls
 print("DONE")

@@ -138,7 +138,20 @@ def sell_position_flow(client: ClobClient, position: dict, dry_run: bool):
     held_size = float(position.get("size", 0))
     show_order_book(token_id)
 
-    price = prompt_float("Enter your sell price, between 0 and 1: $", min_value=0.0001, max_value=0.9999)
+    while True:
+        price = prompt_float(
+            "Enter your sell price, between 0 and 1 (or 0 to refresh the order book): $",
+            min_value=0.0,
+            max_value=0.9999,
+        )
+        if price == 0:
+            show_order_book(token_id)
+            continue
+        if price < 0.0001:
+            print("  Must be at least 0.0001.")
+            continue
+        break
+
     size = prompt_float(f"Enter number of shares to sell (you hold {held_size}): ", min_value=0.0001, max_value=held_size)
 
     print("\nSell order summary:")
