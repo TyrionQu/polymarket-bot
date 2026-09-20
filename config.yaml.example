@@ -2,7 +2,7 @@
 # config.yaml is git-ignored -- never commit your real token or encrypted key.
 
 github:
-  # Personal access token used by setup_github_repo.py (repo scope is enough).
+  # Personal access token used by github_cli.py (repo scope; add delete_repo for `delete`).
   token: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 polymarket:

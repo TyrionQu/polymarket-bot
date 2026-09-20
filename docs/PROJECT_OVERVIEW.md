@@ -13,7 +13,7 @@ with `python3 <script>.py`. Scripts import small shared helpers from each other 
 
 ```bash
 pip install -r requirements.txt
-cp config.yaml.example config.yaml   # fill in your GitHub token if using setup_github_repo.py
+cp config.yaml.example config.yaml   # fill in your GitHub token if using github_cli.py
 python3 test_connection.py           # sanity-check connectivity (works with no key)
 ```
 
@@ -31,7 +31,7 @@ See [docs/BUYING_GUIDE.md](BUYING_GUIDE.md) for the full walkthrough of buying a
 | [`encrypt_key.py`](../encrypt_key.py) | Encrypts your Polygon private key (AES-256-GCM, password-derived key) into a base64 blob to store in `config.yaml`, so the raw key is never stored on disk. |
 | [`key_crypto.py`](../key_crypto.py) | Shared AES-256-GCM encrypt/decrypt + private-key-format validation, used by `encrypt_key.py` and `buy_polymarket.py`. |
 | [`masked_input.py`](../masked_input.py) | Reads one line of input echoing `*` per character (used when entering the private key). |
-| [`setup_github_repo.py`](../setup_github_repo.py) | One-time utility: verifies the GitHub token in `config.yaml` and publishes this project to a new GitHub repo (never includes `config.yaml`). |
+| [`github_cli.py`](../github_cli.py) | Multi-command GitHub helper driven by `config.yaml`'s token (never commits `config.yaml`). Subcommands: `create`, `push` (commit + push, `-m` for the message), `clone`, `list`, `delete` (confirm + `delete_repo` scope), `status`, `pull`. Mutating actions support `--dry-run`. |
 | [`testcases/`](../testcases/) | Ad hoc test scripts exercising interactive flows (e.g. `list_open_orders.py`'s cancel/sell prompts) with fake data/clients. |
 
 ## How the scripts relate
@@ -56,7 +56,7 @@ for the full template. Fields used:
 
 ```yaml
 github:
-  token: ghp_...                 # used only by setup_github_repo.py
+  token: ghp_...                 # used only by github_cli.py
 
 polymarket:
   encrypted_private_key: "..."   # output of encrypt_key.py; decrypted at runtime with a password prompt
