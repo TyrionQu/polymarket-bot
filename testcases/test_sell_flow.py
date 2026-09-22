@@ -38,4 +38,13 @@ m.process_selection(FakeClient(), items, dry_run=True)
 
 # Initial book + one refresh triggered by entering 0 at the price prompt.
 assert len(order_book_calls) == 2, order_book_calls
+
+# Entering 1 at the sell-price prompt exits the program.
+sys.stdin = io.StringIO("0\ny\n1\n")
+try:
+    m.process_selection(FakeClient(), items, dry_run=True)
+    raise AssertionError("expected SystemExit when entering 1 at the price prompt")
+except SystemExit:
+    pass
+
 print("DONE")

@@ -140,15 +140,17 @@ def sell_position_flow(client: ClobClient, position: dict, dry_run: bool):
 
     while True:
         price = prompt_float(
-            "Enter your sell price, between 0 and 1 (or 0 to refresh the order book): $",
+            "Enter your sell price, between 0 and 1 (0 to refresh the order book, 1 to exit): $",
             min_value=0.0,
-            max_value=0.9999,
+            max_value=1.0,
         )
         if price == 0:
             show_order_book(token_id)
             continue
-        if price < 0.0001:
-            print("  Must be at least 0.0001.")
+        if price == 1:
+            sys.exit("Exiting.")
+        if not 0.0001 <= price <= 0.9999:
+            print("  Enter a price between 0.0001 and 0.9999.")
             continue
         break
 
@@ -172,6 +174,7 @@ def sell_position_flow(client: ClobClient, position: dict, dry_run: bool):
     signed_order = client.create_order(order_args)
     response = client.post_order(signed_order, OrderType.GTC)
     print("Order Response:", response)
+    show_order_book(token_id)
 
 
 def process_selection(client: ClobClient, items: list, dry_run: bool):
