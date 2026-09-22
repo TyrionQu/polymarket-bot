@@ -54,15 +54,19 @@ def slug_from_url(url_or_slug: str) -> str:
 def resolve_markets_by_slug(url_or_slug: str) -> list:
     slug = slug_from_url(url_or_slug)
 
-    # Single-market (binary Yes/No) bets: the page slug is the market slug directly.
+    # Try the event endpoint first: a /event/<slug> page groups one or more markets, and an
+    # event slug can collide with one of its own (often resolved) sub-market slugs — querying
+    # /markets first would return just that single colliding market and miss the rest.
+    resp = requests.get(f"{GAMMA_HOST}/events/slug/{slug}", timeout=15)
+    if resp.status_code == 200:
+        markets = resp.json().get("markets", [])
+        if markets:
+            return markets
+
+    # Fall back to a standalone binary Yes/No market when there's no event for this slug.
     resp = requests.get(f"{GAMMA_HOST}/markets/slug/{slug}", timeout=15)
     if resp.status_code == 200:
         return [resp.json()]
-
-    # Multi-market events: the page slug is the event slug; it groups several markets.
-    resp = requests.get(f"{GAMMA_HOST}/events/slug/{slug}", timeout=15)
-    if resp.status_code == 200:
-        return resp.json().get("markets", [])
 
     sys.exit(f"No market or event found for slug {slug!r} (from {url_or_slug!r}).")
 

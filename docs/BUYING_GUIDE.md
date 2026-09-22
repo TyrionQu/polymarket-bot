@@ -219,6 +219,9 @@ python3 buy_polymarket.py --url "..." --signature-type 3 --mode limit --money 50
 | `...must be a 64-character hex string` | Your key is malformed — check for typos or missing characters. |
 | `A token ID is required` | Pass `--url`, `--token-id`, set `POLYMARKET_TOKEN_ID`, or add `--dry-run`. |
 | `No option selected.` | You skipped or quit every option in the interactive `--url` walkthrough. |
+| `No tradeable markets found for this bet (all resolved or closed).` | Every market on that event has already resolved; there's nothing left to buy. |
+| `(Skipping N resolved/closed market(s)...)` | Informational: resolved markets (prices pinned to 0/1, no live order book) are hidden from the buy picker. |
+| `Could not load order book: 404 ... /book?token_id=...` | That token belongs to a resolved/closed market, which has no CLOB order book. Pick a market that's still accepting orders. |
 | `Cancelled.` (after the summary) | You answered anything other than `y` at the confirmation prompt — no order was placed. |
 | `maker address not allowed, please use the deposit wallet flow` | Try `--signature-type 3` (see [section 7](#7-using-a-proxy-or-deposit-wallet)) with `polymarket.funder` set in `config.yaml`. |
 | 403 / geo-block errors | Run `python3 test_connection.py` — the "without key" test flags if your IP is region-blocked. |

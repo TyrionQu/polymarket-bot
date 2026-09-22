@@ -23,7 +23,7 @@ See [docs/BUYING_GUIDE.md](BUYING_GUIDE.md) for the full walkthrough of buying a
 
 | Script | Purpose |
 | --- | --- |
-| [`buy_polymarket.py`](../buy_polymarket.py) | Buy an outcome token at a limit or market price. Supports resolving a bet page URL interactively, shows the live order book before you enter a price, computes share size from a USDC budget, and supports `--dry-run`. |
+| [`buy_polymarket.py`](../buy_polymarket.py) | Buy an outcome token at a limit or market price. Supports resolving a bet page URL interactively (offering only tradeable markets, skipping resolved/closed ones), shows the live order book before you enter a price, computes share size from a USDC budget, and supports `--dry-run`. |
 | [`list_bets.py`](../list_bets.py) | Browse/list Polymarket markets (public Gamma API), or resolve a bet page URL/slug straight to its outcome token IDs. |
 | [`order_book.py`](../order_book.py) | Print the top N bids/asks for a token ID or bet URL. |
 | [`list_open_orders.py`](../list_open_orders.py) | List your unfilled orders and currently-held (not-yet-resolved) positions; interactively cancel an order or sell a position. When selling, it shows the live order book before the price prompt; entering `0` at that prompt refreshes the top-5 bids/asks and asks again, and entering `1` exits the program. |
@@ -40,7 +40,8 @@ There's no central "core" module — instead, small generic helpers are imported
 between scripts to avoid duplicating logic:
 
 - `list_bets.py` owns `resolve_markets_by_slug()` (Gamma API market/event resolution by
-  URL or slug) — imported by `buy_polymarket.py` and `order_book.py`.
+  URL or slug; queries the event endpoint first so a multi-market event isn't mistaken for a
+  single colliding sub-market) — imported by `buy_polymarket.py` and `order_book.py`.
 - `buy_polymarket.py` owns shared interactive-prompt helpers (`prompt_choice`,
   `prompt_float`), `show_order_book()`, private-key loading (`load_private_key`), and
   `config.yaml` reading (`load_polymarket_config`) — imported by `order_book.py` and

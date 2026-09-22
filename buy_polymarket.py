@@ -65,6 +65,19 @@ def market_outcomes(market: dict) -> dict:
     }
 
 
+def is_tradeable(market: dict) -> bool:
+    """True when a market is still open for orders with a live CLOB book.
+
+    Resolved/closed markets have no order book (their /book endpoint 404s) and their
+    prices are pinned to 0/1, so they should never be offered as a buy option.
+    """
+    return (
+        not market.get("closed")
+        and bool(market.get("acceptingOrders"))
+        and bool(market.get("enableOrderBook"))
+    )
+
+
 def prompt_choice(prompt: str, valid: set) -> str:
     while True:
         choice = input(prompt).strip().lower()
@@ -106,12 +119,19 @@ def select_token_interactively(markets: list, args):
     After picking yes/no (and, in limit mode, seeing the order book), the user can still
     back out with [r]eturn to re-pick for the same market instead of committing to a price/amount.
     """
-    for i, market in enumerate(markets, 1):
+    tradeable = [m for m in markets if is_tradeable(m)]
+    skipped = len(markets) - len(tradeable)
+    if skipped:
+        print(f"  (Skipping {skipped} resolved/closed market(s) that can't be traded.)")
+    if not tradeable:
+        sys.exit("No tradeable markets found for this bet (all resolved or closed).")
+
+    for i, market in enumerate(tradeable, 1):
         outcomes = market_outcomes(market)
         yes, no = outcomes.get("yes"), outcomes.get("no")
 
         while True:
-            print(f"\n[{i}/{len(markets)}] {market.get('question') or market.get('slug')}")
+            print(f"\n[{i}/{len(tradeable)}] {market.get('question') or market.get('slug')}")
             if yes:
                 print(f"  yes: price={yes[0]}")
             if no:
