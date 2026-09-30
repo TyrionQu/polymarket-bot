@@ -27,6 +27,7 @@ See [docs/BUYING_GUIDE.md](BUYING_GUIDE.md) for the full walkthrough of buying a
 | [`list_bets.py`](../list_bets.py) | Browse/list Polymarket markets (public Gamma API), or resolve a bet page URL/slug straight to its outcome token IDs. |
 | [`order_book.py`](../order_book.py) | Print the top N bids/asks for a token ID or bet URL. |
 | [`list_open_orders.py`](../list_open_orders.py) | List your unfilled orders and currently-held (not-yet-resolved) positions; interactively cancel an order or sell a position. When selling, it shows the live order book before the price prompt; entering `0` at that prompt refreshes the top-5 bids/asks and asks again, and entering `1` exits the program. |
+| [`list_trade_history.py`](../list_trade_history.py) | List your filled trades (completed buys/sells) for the wallet in `config.yaml`, via the public data-api. Read-only; supports `--limit`/`--offset`/`--side` filters and an `--address` override to inspect any wallet without a key. See [docs/TRADE_HISTORY_GUIDE.md](TRADE_HISTORY_GUIDE.md). |
 | [`test_connection.py`](../test_connection.py) | Verify connectivity: public endpoints (health, geo-block) always run; authenticated endpoint checks run if a key is configured. |
 | [`encrypt_key.py`](../encrypt_key.py) | Encrypts your Polygon private key (AES-256-GCM, password-derived key) into a base64 blob to store in `config.yaml`, so the raw key is never stored on disk. |
 | [`key_crypto.py`](../key_crypto.py) | Shared AES-256-GCM encrypt/decrypt + private-key-format validation, used by `encrypt_key.py` and `buy_polymarket.py`. |
@@ -44,8 +45,11 @@ between scripts to avoid duplicating logic:
   single colliding sub-market) — imported by `buy_polymarket.py` and `order_book.py`.
 - `buy_polymarket.py` owns shared interactive-prompt helpers (`prompt_choice`,
   `prompt_float`), `show_order_book()`, private-key loading (`load_private_key`), and
-  `config.yaml` reading (`load_polymarket_config`) — imported by `order_book.py` and
-  `list_open_orders.py`.
+  `config.yaml` reading (`load_polymarket_config`) — imported by `order_book.py`,
+  `list_open_orders.py`, and `list_trade_history.py`.
+- `list_trade_history.py` fetches filled trades from the public data-api `/trades` endpoint
+  (like `list_open_orders.py` does for positions), reusing `buy_polymarket.py`'s config/key
+  loading only to resolve which wallet address to query.
 - `order_book.py` owns `fetch_order_book()`/`print_order_book()` — imported (via a
   function-local import, to avoid a circular import) by `buy_polymarket.py`.
 - `key_crypto.py` and `masked_input.py` are leaf modules with no repo-internal imports.
