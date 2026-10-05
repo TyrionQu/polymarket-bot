@@ -21,3 +21,9 @@ polymarket:
   # at all for --signature-type 0 (plain EOA wallet).
   funder: "0xYourPolymarketDepositWalletAddress"
 
+  # Optional. Public Polygon RPC used by buy_polymarket.py to read your USDC
+  # balance (the bankroll it sizes Kelly-criterion bets against). Defaults to a
+  # public endpoint; override here or via POLYMARKET_RPC_URL if that one is slow
+  # or rate-limited. Not a secret. Alternatives: https://1rpc.io/matic
+  rpc_url: "https://polygon.drpc.org"
+

@@ -1,8 +1,10 @@
 # How to Buy a Polymarket Bet with `buy_polymarket.py`
 
-This guide walks through placing a buy order on Polymarket using [buy_polymarket.py](../buy_polymarket.py),
-either at a **limit price** (you set the price) or at **market price** (fills immediately at
-the best available price).
+This guide walks through placing a buy order on Polymarket using [buy_polymarket.py](../buy_polymarket.py).
+You enter the **buy price** you're willing to pay and the script places a **limit order** at that
+price, sizing the stake for you with the **Kelly criterion** — you supply your own estimate of
+the outcome's true win chance, and it suggests how much of your wallet to bet (then converts that
+dollar stake into whole shares at your price).
 
 ## 1. Prerequisites
 
@@ -32,7 +34,7 @@ You don't need to look up a `token_id` yourself. Pass the bet's page URL with `-
 `buy_polymarket.py` resolves it and walks you through every outcome interactively:
 
 ```bash
-python3 buy_polymarket.py --url "https://polymarket.com/event/epl-2027-champion-20260701200428749" --mode market --amount 25
+python3 buy_polymarket.py --url "https://polymarket.com/event/epl-2027-champion-20260701200428749"
 ```
 
 For each option it prints the current Yes/No prices and asks:
@@ -41,13 +43,15 @@ For each option it prints the current Yes/No prices and asks:
 [3/24] Will Bournemouth win the 2026-27 English Premier League (EPL) Championship?
   yes: price=0.0015
   no : price=0.9985
-  Buy [y]es / [n]o / [s]kip / [q]uit?
+  Buy [y]es / [n]o / [s]kip / [q]uit? (Enter = skip)
 ```
 
-- `y` / `n` — buys that outcome immediately using the mode/price/size/amount you passed on
-  the command line, and grabs the correct token ID for you.
+- `y` / `n` — selects that outcome (grabbing the correct token ID for you) and moves on to the
+  Kelly sizing step (see [section 5](#5-let-kelly-size-your-bet)).
 - `s` — skips to the next option in the event.
 - `q` — cancels without buying anything.
+- **Enter** (empty input) — defaults to `s` (skip) so you can tab through options quickly; on
+  the **last** option it defaults to `q` (quit) instead.
 
 This works for:
 - Single-market ("Yes"/"No") bet pages — you're asked about that one market.
@@ -73,115 +77,136 @@ python3 list_bets.py --url "https://polymarket.com/event/will-there-be-no-change
 If you already have a `token_id`, skip `--url` entirely and pass it directly (either
 `export POLYMARKET_TOKEN_ID=...` or `--token-id <id>` on `buy_polymarket.py`).
 
-## 5. Choose limit or market, and run it
+## 5. Let Kelly size your bet
 
-You never have to compute shares yourself — just tell the script how much money you want
-to spend with `--money` (or leave it out and it'll ask). It converts that budget into the
-right field for whichever mode you pick.
+You don't pick a share count or a dollar amount up front. After you choose an outcome, the
+script prints the **top-5 bids/asks** (the live order book), asks you to **enter the price you
+want to evaluate**, reads your **wallet's USDC balance** as your bankroll, and suggests a stake
+using the Kelly criterion. Enter a different price and the suggestion is **recomputed**, so you
+can re-quote until you're happy (enter `0` at the price prompt to refresh the order book).
 
-### Option A: Limit order (`--mode limit`, the default)
+For a token that pays \$1 if it wins and \$0 if it loses, bought at price `P`, with your
+estimated win probability `p`, the full-Kelly fraction of your bankroll is:
 
-You pick the price cap; the order only fills at that price or better and can sit unfilled
-(`GTC` — good till cancelled) if the market doesn't reach it.
+```
+f* = (p - P) / (1 - P)
+```
+
+The script stakes a **fraction** of that (half-Kelly, `0.5`, by default \u2014 lower variance than
+full Kelly), so the suggested amount is `kelly_fraction * f* * bankroll`. Because `P` is the
+price you'd pay (the market's implied probability), Kelly only suggests a positive bet when your
+estimate `p` is **higher** than that price (i.e. you believe you have an edge).
 
 ```bash
-python3 buy_polymarket.py --url "https://polymarket.com/event/epl-2027-champion-20260701200428749" --mode limit --money 50
+python3 buy_polymarket.py --url "https://polymarket.com/event/epl-2027-champion-20260701200428749"
 ```
 
-Since `--price` isn't given, once you pick an outcome you're prompted for your limit price
-(with that option's current price shown as a hint), then the size is computed as
-`floor(money / price)` — shares are whole units, so the size is rounded down to keep the
-spend at or under your budget. What happens with each flag:
-
-- `--price` — your limit price per share (0–1). Optional: pass it directly to skip the
-  prompt (useful for scripting), or leave it out to be prompted per-option.
-- `--money` — total USDC budget. Size is computed as `floor(money / price)`. If omitted
-  (and `--size` isn't given either), you're prompted for it.
-- `--size` — set this instead of `--money` if you'd rather specify the exact share count
-  directly (not rounded).
-
-### Option B: Market order (`--mode market`)
-
-The script prices it off the live order book and submits as `FOK` (fill-or-kill) — it
-either fills immediately in full or is cancelled.
-
-```bash
-python3 buy_polymarket.py --mode market --money 50
-```
-
-- `--money` (or `--amount`) is the USDC amount you want to spend — for market orders this
-  IS the amount sent to the API directly (it resolves the best price for you), no
-  conversion needed. If omitted, you're prompted for it.
-- No `--price` is needed; you'll get the best price currently available.
-
-If you're using `--url`, the mode/price/size/money flags apply to whichever outcome you
-select interactively — no `--token-id` needed. Otherwise, add `--token-id <id>` (or export
-`POLYMARKET_TOKEN_ID`).
-
-Before anything is submitted, the script always prints a summary of the exchange:
-
-- **Market mode**: the total USDC amount you're spending.
-- **Limit mode**: price, size (shares), and the total cost (`price * size`).
-
-For a **real order** (no `--dry-run`), you're then asked to confirm:
+A typical run after you pick an outcome:
 
 ```
-Enter your limit price (current price: 0.495), between 0 and 1: $0.52
-Enter total USDC amount to spend: $50
-  -> floor(50.0 / 0.52) = 96 shares ($49.92)
+   PRICE            SHARES             TOTAL
+Asks:
+   41.0¢         1,200.00        $    492.00
+   40.5¢         3,400.00        $  1,377.00
+Last: 40.0¢   Spread: 1.0¢
+Bids:
+   39.5¢         2,100.00        $    829.50
+   39.0¢         5,000.00        $  1,950.00
+Enter your buy price (current 0.4), between 0 and 1 (0 to refresh the order book): $0.40
+  Your estimated chance this wins (0-1): 0.55
+  Bankroll: $200.00 USDC (Polymarket collateral)
+  Kelly edge f*=0.2500; 0.5x Kelly on $200.00 -> suggested stake $25.00
+  [a]ccept $25.00 / [c]ustom amount / [r]e-enter price / [q]uit? a
+  -> 62 shares at 0.4000 = $24.80
 
 Order summary:
   token_id : 5615282760875985231868508008056959876238536896643315063916840237042205273721  (YES)
   side     : BUY
-  mode     : limit
-  price    : 0.52
-  size     : 96
-  total    : $49.92
+  type     : limit (GTC)
+  price    : 0.4000 (your buy price)
+  size     : 62 shares
+  total    : $24.80
+  your p   : 0.5500
+  bankroll : $200.00
+  kelly    : 0.5x
 Confirm and place this order? [y/n] y
 ```
 
-Answering anything other than `y` cancels immediately — no private key is loaded and no
-order is placed unless you confirm.
+Flags that tune or skip the Kelly flow:
 
-On success it prints the order response, including the order ID and status
-(e.g. `matched`, `live`, or `delayed`).
+- `--win-prob` \u2014 your estimated win probability (0\u20131). Pass it to skip the prompt; omit it to
+  be asked after you enter the price.
+- `--kelly-fraction` — fraction of full Kelly to stake (default `0.5`). Use `1` for full Kelly
+  (higher growth, higher variance) or a smaller number to be more conservative.
+- `--amount` / `--money` — a fixed USDC amount to spend. Passing either **overrides the Kelly
+  stake** (no probability prompt, no balance lookup); you still enter a buy price, and it buys
+  `floor(amount / price)` shares at that price.
+- `--address` \u2014 the wallet address whose USDC balance is read as the bankroll. Defaults to your
+  `funder` (proxy/deposit wallets) or your EOA signing address. Handy with `--dry-run`.
+
+**Where the bankroll comes from:** for a real run the script reads your **Polymarket collateral
+balance** (the USDC the exchange lets you trade with — the same number `list_open_orders.py`
+shows), via the authenticated CLOB client. You'll be asked for your decryption password up front
+(one prompt, reused to place the order). In `--dry-run` there's no client, so it falls back to an
+on-chain USDC `balanceOf` over a public RPC (`POLYMARKET_RPC_URL`) when a wallet address is known,
+otherwise it prompts for a bankroll. Note a raw `balanceOf` can read `$0` for proxy/deposit
+wallets even when you have funds, because the collateral isn't held as plain USDC in that address.
+
+**No edge?** If your estimate isn't above the price you entered, `f*` is ≤ 0 and Kelly
+recommends **not** betting. The script says so and lets you re-enter a different price, type a
+manual amount anyway, or quit:
+
+```
+Enter your buy price, between 0 and 1 (0 to refresh the order book): $0.60
+  Your estimated chance this wins (0-1): 0.55
+  No edge: your estimate (0.5500) is not above your buy price (0.6000); Kelly recommends NOT betting.
+  [r]e-enter price / [m]anual amount / [q]uit? q
+Cancelled (no edge).
+```
+
+Answering anything other than `y` at the final confirmation cancels immediately \u2014 no private
+key is loaded and no order is placed unless you confirm. On success it prints the order
+response, including the order ID and status (e.g. `matched`, `live`, or `delayed`).
 
 ## 6. Try it risk-free with `--dry-run`
 
-Add `--dry-run` to preview the same summary, without needing `POLYMARKET_PRIVATE_KEY`,
-without posting a real order, and without the confirmation prompt (it's already just a
-preview):
+Add `--dry-run` to preview the same summary without needing `POLYMARKET_PRIVATE_KEY`, without
+posting a real order, and without the confirmation prompt (it's already just a preview). In
+dry-run the private key isn't required; if a wallet address is known (via `--address` or your
+`funder`) the real balance is still fetched, otherwise you're prompted to type a bankroll
+number so the math can be demonstrated:
 
 ```bash
-python3 buy_polymarket.py --dry-run --url "https://polymarket.com/event/epl-2027-champion-20260701200428749" --mode limit
+python3 buy_polymarket.py --dry-run --token-id 917268...142 --address 0xYourWallet... --win-prob 0.55
 ```
 
-Since `--price`/`--money` aren't given, you'll be prompted after picking an outcome:
-
 ```
-[3/24] Will Bournemouth win the 2026-27 English Premier League (EPL) Championship?
-  yes: price=0.0015
-  no : price=0.9985
-  Buy [y]es / [n]o / [s]kip / [q]uit? y
-Enter your limit price (current price: 0.0015), between 0 and 1: $0.002
-Enter total USDC amount to spend: $10
-  -> floor(10.0 / 0.002) = 5000 shares ($10.00)
+Enter your buy price, between 0 and 1 (0 to refresh the order book): $0.40
+  Bankroll: $200.00 USDC  [0xYourWallet...]
+  Kelly edge f*=0.2500; 0.5x Kelly on $200.00 -> suggested stake $25.00
+  [a]ccept $25.00 / [c]ustom amount / [r]e-enter price / [q]uit? a
+  -> 62 shares at 0.4000 = $24.80
 
 [DRY RUN] Would submit:
-  token_id : 917268...142  (YES)
+  token_id : 917268...142
   side     : BUY
-  mode     : limit
-  price    : 0.002
-  size     : 5000
-  total    : $10.00
+  type     : limit (GTC)
+  price    : 0.4000 (your buy price)
+  size     : 62 shares
+  total    : $24.80
+  your p   : 0.5500
+  bankroll : $200.00
+  kelly    : 0.5x
 ```
 
-Pass `--price`/`--money`/`--amount`/`--size` on the command line to skip any of these
-prompts (useful for scripting).
+You can also skip Kelly in a dry-run with a fixed amount (no network, no prompts):
 
+```bash
+python3 buy_polymarket.py --dry-run --token-id 917268...142 --amount 10
+```
 
-You can even dry-run with no `--url`/`--token-id` at all — a placeholder token ID is used
-just to exercise the argument validation.
+You can even dry-run with no `--url`/`--token-id` at all \u2014 a placeholder token ID is used
+just to exercise the argument validation (pair it with `--amount` to skip the price lookup).
 
 ## 7. Using a proxy or deposit wallet
 
@@ -208,7 +233,7 @@ polymarket:
 rarely changes between runs — set it once in `config.yaml` and just pass `--signature-type`:
 
 ```bash
-python3 buy_polymarket.py --url "..." --signature-type 3 --mode limit --money 50
+python3 buy_polymarket.py --url "..." --signature-type 3
 ```
 
 ## Troubleshooting
@@ -222,6 +247,9 @@ python3 buy_polymarket.py --url "..." --signature-type 3 --mode limit --money 50
 | `No tradeable markets found for this bet (all resolved or closed).` | Every market on that event has already resolved; there's nothing left to buy. |
 | `(Skipping N resolved/closed market(s)...)` | Informational: resolved markets (prices pinned to 0/1, no live order book) are hidden from the buy picker. |
 | `Could not load order book: 404 ... /book?token_id=...` | That token belongs to a resolved/closed market, which has no CLOB order book. Pick a market that's still accepting orders. |
+| `(Could not read wallet balance: ...)` | The Polygon RPC call failed (network, rate limit, or unknown address); you'll be prompted to type a bankroll instead. Try another endpoint via `POLYMARKET_RPC_URL`. |
+| `No edge: your estimate ... is not above the market price ...` | Your win-probability estimate is ≤ the market price, so Kelly recommends not betting. Only raise your estimate if you genuinely believe it, or enter a manual amount. |
+| `Cancelled (no edge).` | You chose `[q]uit` at the no-edge prompt instead of re-entering a price or a manual amount — no order was placed. |
 | `Cancelled.` (after the summary) | You answered anything other than `y` at the confirmation prompt — no order was placed. |
 | `maker address not allowed, please use the deposit wallet flow` | Try `--signature-type 3` (see [section 7](#7-using-a-proxy-or-deposit-wallet)) with `polymarket.funder` set in `config.yaml`. |
 | 403 / geo-block errors | Run `python3 test_connection.py` — the "without key" test flags if your IP is region-blocked. |
@@ -229,8 +257,9 @@ python3 buy_polymarket.py --url "..." --signature-type 3 --mode limit --money 50
 
 ## Safety notes
 
-- This script places a **real order with real funds** — double-check the mode, price/amount,
-  size, and token ID before running.
-- Market orders execute immediately at the best available price — there's no chance to
-  cancel once submitted.
+- This script places a **real order with real funds** — double-check your win-probability
+  estimate, your buy price, the share count, and the token ID before confirming.
+- It's a **limit (GTC)** order: it fills at your price or better and otherwise rests on the
+  book unfilled until it fills or you cancel it (see `list_open_orders.py`). You won't overpay,
+  but a price below the best ask may not fill right away.
 - Never commit your private key or `config.yaml` to source control.

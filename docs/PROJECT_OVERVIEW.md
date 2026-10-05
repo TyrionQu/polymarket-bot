@@ -23,7 +23,7 @@ See [docs/BUYING_GUIDE.md](BUYING_GUIDE.md) for the full walkthrough of buying a
 
 | Script | Purpose |
 | --- | --- |
-| [`buy_polymarket.py`](../buy_polymarket.py) | Buy an outcome token at a limit or market price. Supports resolving a bet page URL interactively (offering only tradeable markets, skipping resolved/closed ones), shows the live order book before you enter a price, computes share size from a USDC budget, and supports `--dry-run`. |
+| [`buy_polymarket.py`](../buy_polymarket.py) | Buy an outcome token with a **limit (GTC)** order at the price you choose, sizing the stake via the **Kelly criterion** (dollar stake converted to whole shares via `floor(stake / price)`). Resolves a bet page URL interactively (offering only tradeable markets, skipping resolved/closed ones), prints the top-5 order book and lets you enter your buy price (re-quoting re-runs Kelly), reads the bankroll from your Polymarket collateral balance (on-chain RPC `balanceOf` fallback in `--dry-run`), warns when there's no edge, and supports `--dry-run`. |
 | [`list_bets.py`](../list_bets.py) | Browse/list Polymarket markets (public Gamma API), or resolve a bet page URL/slug straight to its outcome token IDs. |
 | [`order_book.py`](../order_book.py) | Print the top N bids/asks for a token ID or bet URL. |
 | [`list_open_orders.py`](../list_open_orders.py) | List your unfilled orders and currently-held (not-yet-resolved) positions; interactively cancel an order or sell a position. When selling, it shows the live order book before the price prompt; entering `0` at that prompt refreshes the top-5 bids/asks and asks again, and entering `1` exits the program. |
@@ -79,6 +79,8 @@ useful for scripting/automation:
 | `POLYMARKET_TOKEN_ID` | Default `--token-id` for `buy_polymarket.py`. |
 | `POLYMARKET_SIGNATURE_TYPE` | Default `--signature-type` (0=EOA, 1=Proxy/email, 2=Gnosis Safe, 3=Deposit Wallet). |
 | `POLYMARKET_FUNDER` | Default deposit/proxy wallet address (fallback for `polymarket.funder`). |
+| `POLYMARKET_ADDRESS` | Default `--address`: wallet whose USDC balance is read as the Kelly bankroll in `buy_polymarket.py` (defaults to the funder or EOA signing address). |
+| `POLYMARKET_RPC_URL` | Public Polygon RPC used to read the USDC balance for Kelly sizing (defaults to a public endpoint). |
 
 ## Security model
 

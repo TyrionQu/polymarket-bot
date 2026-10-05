@@ -81,14 +81,27 @@ def test_is_tradeable():
 
 def test_picker_skips_resolved_markets():
     # Resolved market is first; if filtering works, the tradeable "Live-B" is offered as [1/N].
-    args = types.SimpleNamespace(mode="market")
+    args = types.SimpleNamespace()
     sys.stdin = io.StringIO("y\ne\n")  # buy Yes on the first tradeable market, then enter amount
     label, token_id, price = buy.select_token_interactively(EVENT_MARKETS, args)
     assert (label, token_id, price) == ("YES", "lb_yes", 0.4), (label, token_id, price)
+
+
+def test_picker_enter_defaults_to_skip_then_quit():
+    # Two tradeable markets: pressing Enter skips the first, then defaults to quit on the last.
+    args = types.SimpleNamespace()
+    sys.stdin = io.StringIO("\n\n")
+    try:
+        buy.select_token_interactively(EVENT_MARKETS, args)
+    except SystemExit as e:
+        assert str(e) == "Cancelled.", e
+    else:
+        raise AssertionError("Enter on the last option should default to quit")
 
 
 test_resolve_prefers_event_over_colliding_market()
 test_resolve_falls_back_to_market_when_no_event()
 test_is_tradeable()
 test_picker_skips_resolved_markets()
+test_picker_enter_defaults_to_skip_then_quit()
 print("DONE")
