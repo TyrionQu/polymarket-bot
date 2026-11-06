@@ -72,22 +72,23 @@ def fetch_wallet_balance(client: ClobClient):
 
 
 def fetch_held_positions(address: str) -> list:
-    """Positions currently held for a wallet, via the public data-api (no CLOB auth needed)."""
-    resp = requests.get(f"{DATA_HOST}/positions", params={"user": address, "limit": 500}, timeout=15)
+    """Positions currently held for a wallet, via the public data-api v2 (no CLOB auth needed)."""
+    resp = requests.get(f"{DATA_HOST}/v2/positions", params={"user": address, "limit": 500}, timeout=15)
     resp.raise_for_status()
-    positions = resp.json()
+    # Data API v2 wraps the payload in a "data" key (null when there are no positions).
+    positions = resp.json().get("data") or []
     # "redeemable" means the market already resolved and this token can be cashed out;
     # exclude those to show only bets that haven't been decided win/lose yet.
-    return [p for p in positions if not p.get("redeemable") and float(p.get("size") or 0) > 0]
+    return [p for p in positions if not p.get("redeemable") and float(p.get("current_size") or 0) > 0]
 
 
 def format_position(position: dict) -> str:
-    size = float(position.get("size", 0))
-    avg_price = float(position.get("avgPrice", 0))
-    cur_price = float(position.get("curPrice", 0))
-    current_value = float(position.get("currentValue", 0))
-    cash_pnl = float(position.get("cashPnl", 0))
-    percent_pnl = position.get("percentPnl")
+    size = float(position.get("current_size", 0))
+    avg_price = float(position.get("avg_price", 0))
+    cur_price = float(position.get("current_price", 0))
+    current_value = float(position.get("current_value", 0))
+    cash_pnl = float(position.get("total_pnl", 0))
+    percent_pnl = position.get("percent_pnl")
 
     return "\n".join([
         f"Question    : {position.get('title')}",
@@ -105,7 +106,7 @@ def build_items(orders: list, positions: list) -> list:
     for order in orders:
         items.append({"type": "order", "address": order.get("asset_id"), "data": order})
     for position in positions:
-        items.append({"type": "position", "address": position.get("asset"), "data": position})
+        items.append({"type": "position", "address": position.get("token_id"), "data": position})
     return items
 
 
@@ -134,8 +135,8 @@ def sell_position_flow(client: ClobClient, position: dict, dry_run: bool):
     if prompt_choice("Sell this bet? [y/n] ", {"y", "n"}) != "y":
         return
 
-    token_id = position.get("asset")
-    held_size = float(position.get("size", 0))
+    token_id = position.get("token_id")
+    held_size = float(position.get("current_size", 0))
     show_order_book(token_id)
 
     while True:

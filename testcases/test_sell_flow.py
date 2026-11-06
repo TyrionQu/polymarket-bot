@@ -16,8 +16,8 @@ class FakeClient:
 
 
 fake_positions = [
-    {"asset": "222", "size": 50, "avgPrice": 0.4, "curPrice": 0.45, "currentValue": 22.5,
-     "cashPnl": 2.5, "percentPnl": 12.5, "title": "Fake market?", "outcome": "No", "redeemable": False},
+    {"token_id": "222", "current_size": 50, "avg_price": 0.4, "current_price": 0.45, "current_value": 22.5,
+     "total_pnl": 2.5, "percent_pnl": 12.5, "title": "Fake market?", "outcome": "No", "redeemable": False},
 ]
 items = m.build_items([], fake_positions)
 

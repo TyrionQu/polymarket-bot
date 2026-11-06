@@ -48,7 +48,8 @@ between scripts to avoid duplicating logic:
   `config.yaml` reading (`load_polymarket_config`) — imported by `order_book.py`,
   `list_open_orders.py`, and `list_trade_history.py`.
 - `list_trade_history.py` fetches filled trades from the public data-api `/trades` endpoint
-  (like `list_open_orders.py` does for positions), reusing `buy_polymarket.py`'s config/key
+  (like `list_open_orders.py` does for held positions via the data-api `/v2/positions`
+  endpoint), reusing `buy_polymarket.py`'s config/key
   loading only to resolve which wallet address to query.
 - `order_book.py` owns `fetch_order_book()`/`print_order_book()` — imported (via a
   function-local import, to avoid a circular import) by `buy_polymarket.py`.
